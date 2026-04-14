@@ -1,8 +1,9 @@
 import { pipeline, env } from 'https://jsdelivr.net';
 
-// Disable WebGPU to avoid security/origin errors on GitHub Pages
+// Essential settings to bypass browser blocks
 env.allowLocalModels = false;
 env.useBrowserCache = true;
+env.backbone_device = 'wasm'; // Force CPU to avoid WebGPU security errors
 
 const status = document.getElementById('status');
 const chatLog = document.getElementById('chat-log');
@@ -13,14 +14,14 @@ let generator;
 
 async function init() {
     try {
-        status.textContent = 'Loading Small AI (135MB)...';
+        status.textContent = 'Contacting AI Server...';
         
-        // Using SmolLM-135M: it's tiny, fast, and works on almost any browser
-        generator = await pipeline('text-generation', 'onnx-community/SmolLM2-135B-Instruct-ONNX', {
-            device: 'wasm', // Use standard WebAssembly (CPU) for maximum compatibility
+        // Using an extremely small, highly compatible model
+        generator = await pipeline('text-generation', 'Xenova/Qwen1.5-0.5B-Chat', {
+            device: 'wasm',
             progress_callback: (data) => {
                 if (data.status === 'progress') {
-                    status.textContent = `Downloading: ${Math.round(data.loaded / data.total * 100)}%`;
+                    status.textContent = `Downloading AI: ${Math.round(data.loaded / data.total * 100)}%`;
                 }
             }
         });
@@ -28,8 +29,8 @@ async function init() {
         status.textContent = 'AI Ready!';
         sendBtn.disabled = false;
     } catch (e) {
-        console.error("Initialization Error:", e);
-        status.textContent = 'Error: ' + e.message;
+        console.error("The " + e.name + " happened: " + e.message);
+        status.textContent = "Security block detected. Try Chrome or check your connection.";
     }
 }
 
@@ -39,18 +40,18 @@ sendBtn.onclick = async () => {
 
     chatLog.innerHTML += `<p><strong>You:</strong> ${text}</p>`;
     input.value = '';
-    status.textContent = 'Thinking...';
+    status.textContent = 'AI is thinking...';
 
+    // Simple generation logic
     const output = await generator(text, { 
         max_new_tokens: 50,
-        temperature: 0.6,
+        temperature: 0.7,
         do_sample: true 
     });
 
     const botReply = output[0].generated_text.replace(text, '').trim();
     chatLog.innerHTML += `<p><strong>AI:</strong> ${botReply}</p>`;
     status.textContent = 'AI Ready';
-    chatLog.scrollTop = chatLog.scrollHeight;
 };
 
 init();
