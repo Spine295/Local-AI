@@ -1,4 +1,7 @@
-import { pipeline } from 'https://jsdelivr.net';
+import { pipeline, env } from 'https://jsdelivr.net';
+
+// Ensure the model stays in the browser's persistent storage
+env.useBrowserCache = true;
 
 const status = document.getElementById('status');
 const chatLog = document.getElementById('chat-log');
@@ -7,49 +10,48 @@ const sendBtn = document.getElementById('send-btn');
 
 let generator;
 
-// 1. Initialize the Chatbot
 async function init() {
-    status.textContent = 'Downloading Chatbot (approx 650MB)...';
     try {
+        status.textContent = 'Initializing AI (checking local storage)...';
+        
         generator = await pipeline('text-generation', 'onnx-community/TinyLlama-1.1B-Chat-v1.0-ONNX', {
-            device: 'webgpu', // Uses your GPU for speed
-            dtype: 'q4',     // Uses a "quantized" version to save space/memory
+            device: 'webgpu', 
+            dtype: 'q4',
+            // This function updates the status bar while the model downloads
+            progress_callback: (data) => {
+                if (data.status === 'progress') {
+                    status.textContent = `Downloading AI: ${Math.round(data.loaded / data.total * 100)}%`;
+                } else if (data.status === 'ready') {
+                    status.textContent = 'AI Ready (Offline & WebGPU)';
+                }
+            }
         });
-        status.textContent = 'Chatbot Ready (Offline & WebGPU)';
+
         sendBtn.disabled = false;
     } catch (e) {
-        status.textContent = 'WebGPU failed. Trying CPU (Slower)...';
-        generator = await pipeline('text-generation', 'onnx-community/TinyLlama-1.1B-Chat-v1.0-ONNX');
-        status.textContent = 'Chatbot Ready (CPU Mode)';
-        sendBtn.disabled = false;
+        console.error(e);
+        status.textContent = 'Error: Check if your browser supports WebGPU or try refreshing.';
     }
 }
 
-// 2. Handle Chatting
 sendBtn.onclick = async () => {
     const text = input.value;
     if (!text || !generator) return;
 
-    // Display user message
     chatLog.innerHTML += `<p><strong>You:</strong> ${text}</p>`;
     input.value = '';
-    status.textContent = 'Thinking...';
+    status.textContent = 'AI is thinking...';
 
-    // Format for TinyLlama Chat
     const messages = [{ role: "user", content: text }];
-    
-    // Generate response
     const output = await generator(messages, { 
-        max_new_tokens: 100,
+        max_new_tokens: 120,
         temperature: 0.7,
         do_sample: true 
     });
 
     const botReply = output[0].generated_text.at(-1).content;
-    
-    // Display bot message
     chatLog.innerHTML += `<p><strong>AI:</strong> ${botReply}</p>`;
-    status.textContent = 'Chatbot Ready';
+    status.textContent = 'AI Ready';
     chatLog.scrollTop = chatLog.scrollHeight;
 };
 
